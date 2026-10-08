@@ -1,0 +1,27 @@
+plaso.tsv: what plaso (the log2timeline/plaso:20260720 Docker image) reads
+from the logs in tests/fixtures/plaso/ (santa.log uncompressed), written by
+plaso.py from psort's JSON lines; one line per event: the file, the time
+(ISO 8601; local times as plaso stores them, as if UTC), plaso's name for
+it, the parser, and every value plaso read (see plaso.py). Written from
+plaso's output, not from this crate.
+
+The year-less logs (Snort without a year, glog, securityd, the application
+firewall) are dated by plaso from the files' timestamps: they were run with
+their modification time set to 2024-06-01T00:00:00Z, which tests/plaso.rs
+passes as Context::modified.
+
+Made on a Debian host with Docker, the logs in /tmp/oracle/in, from the
+crate root:
+
+  touch -d "2024-06-01 00:00:00 UTC" /tmp/oracle/in/*
+  sudo docker run --rm -v /tmp/oracle:/data log2timeline/plaso:20260720 \
+    log2timeline --status_view none -q \
+    --parsers 'text/vsftpd,text/postgresql,text/popularity_contest,text/snort_fastlog,text/googlelog,text/santa,text/mac_securityd,text/mac_appfirewall_log' \
+    --storage-file /data/out.plaso /data/in
+  sudo docker run --rm -v /tmp/oracle:/data log2timeline/plaso:20260720 \
+    psort --status_view none -q -a -o json_line -w /data/out.jsonl /data/out.plaso
+  python3 -I tests/oracle/plaso.py /tmp/oracle/out.jsonl > tests/oracle/plaso.tsv
+
+psort's -a keeps the events it would otherwise drop as duplicates (7 of
+358 here: lines logged twice, such as popularity-contest's `at`), so that
+every event is compared.
